@@ -165,6 +165,8 @@ ipcMain.handle('usage:range', (_e, days: number) => {
   return getUsageSince(sinceKey)
 })
 
+ipcMain.handle('usage:all', () => getUsageSince('1970-01-01'))
+
 ipcMain.handle('limits:get', () => getLimits())
 
 ipcMain.handle('limits:set', (_e, appName: string, limitSeconds: number) => {

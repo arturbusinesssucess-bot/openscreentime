@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
 import type { AppUsage, DayAppUsage, TodayUsage } from '../electron/preload'
+import { supabase, pushLocalUsage, pullAllUsage, type RemoteUsageRow } from './supabase'
 
 function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600)
@@ -315,8 +317,137 @@ function LimitsView() {
   )
 }
 
+function DeviceSummary({ rows }: { rows: RemoteUsageRow[] }) {
+  const byDevice = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of rows) map.set(r.device, (map.get(r.device) ?? 0) + r.seconds)
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1])
+  }, [rows])
+
+  const total = byDevice.reduce((sum, [, s]) => sum + s, 0)
+
+  if (rows.length === 0) return <p className="muted">Nenhum dado sincronizado ainda.</p>
+
+  return (
+    <div>
+      <div className="total-card">
+        <span className="total-label">Total combinado (todos os dispositivos, 7 dias)</span>
+        <span className="total-value">{formatDuration(total)}</span>
+      </div>
+      <div className="app-list">
+        {byDevice.map(([device, seconds], i) => (
+          <div className="app-row" key={device}>
+            <div className="app-row-header">
+              <span className="app-name">{device === 'desktop' ? 'Desktop' : 'Android'}</span>
+              <span className="app-time">{formatDuration(seconds)}</span>
+            </div>
+            <div className="bar-track">
+              <div
+                className="bar-fill"
+                style={{ width: `${total > 0 ? (seconds / total) * 100 : 0}%`, background: COLORS[i % COLORS.length] }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function AccountView() {
+  const [session, setSession] = useState<Session | null>(null)
+  const [loadingSession, setLoadingSession] = useState(true)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [syncStatus, setSyncStatus] = useState('')
+  const [remoteRows, setRemoteRows] = useState<RemoteUsageRow[]>([])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoadingSession(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  const handleSignIn = async () => {
+    setAuthError('')
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) setAuthError(error.message)
+  }
+
+  const handleSignUp = async () => {
+    setAuthError('')
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) setAuthError(error.message)
+    else setAuthError('Conta criada. Verifique seu e-mail se a confirmação estiver ativada, ou já entre normalmente.')
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setRemoteRows([])
+  }
+
+  const handleSync = async () => {
+    setSyncStatus('Sincronizando...')
+    try {
+      const localRows = await window.openScreenTime.getAllUsage()
+      await pushLocalUsage(localRows)
+      const remote = await pullAllUsage()
+      setRemoteRows(remote)
+      setSyncStatus(`Sincronizado às ${new Date().toLocaleTimeString('pt-BR')}`)
+    } catch (err) {
+      setSyncStatus(`Erro: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  if (loadingSession) return <p className="muted">Carregando...</p>
+
+  if (!session) {
+    return (
+      <div className="auth-form">
+        <p className="muted">
+          Entre com uma conta pra sincronizar o uso do desktop com o app Android e ver o tempo combinado.
+        </p>
+        <input type="email" placeholder="e-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <input
+          type="password"
+          placeholder="senha"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <div className="auth-buttons">
+          <button onClick={handleSignIn}>Entrar</button>
+          <button className="secondary" onClick={handleSignUp}>
+            Criar conta
+          </button>
+        </div>
+        {authError && <p className="muted export-status">{authError}</p>}
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="export-row">
+        <span className="app-name">{session.user.email}</span>
+        <button className="link-btn export-btn" onClick={handleSync}>
+          Sincronizar agora
+        </button>
+        <button className="link-btn export-btn" onClick={handleSignOut}>
+          Sair
+        </button>
+        {syncStatus && <span className="muted export-status">{syncStatus}</span>}
+      </div>
+      <DeviceSummary rows={remoteRows} />
+    </div>
+  )
+}
+
 export default function App() {
-  const [tab, setTab] = useState<'today' | 'history' | 'limits'>('today')
+  const [tab, setTab] = useState<'today' | 'history' | 'limits' | 'account'>('today')
 
   return (
     <div className="app-shell">
@@ -332,12 +463,16 @@ export default function App() {
           <button className={tab === 'limits' ? 'active' : ''} onClick={() => setTab('limits')}>
             Limites
           </button>
+          <button className={tab === 'account' ? 'active' : ''} onClick={() => setTab('account')}>
+            Conta
+          </button>
         </nav>
       </header>
       <main className="app-main">
         {tab === 'today' && <TodayView />}
         {tab === 'history' && <HistoryView />}
         {tab === 'limits' && <LimitsView />}
+        {tab === 'account' && <AccountView />}
       </main>
     </div>
   )

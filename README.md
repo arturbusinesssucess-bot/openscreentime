@@ -1,6 +1,6 @@
 # OpenScreenTime
 
-App de código aberto para acompanhar quanto tempo você passa no computador e no celular, app por app — no estilo StayFree / RescueTime / Scolect, mas open source e com seus dados guardados localmente (nada sai do seu dispositivo).
+App de código aberto para acompanhar quanto tempo você passa no computador e no celular, app por app — no estilo StayFree / RescueTime / Scolect. Local-first por padrão (os dados ficam só no seu dispositivo); sincronizar entre desktop e Android é opcional, via login.
 
 ## Estrutura do repositório
 
@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Isso abre a janela do Electron com o dashboard ("Hoje" e "Últimos 7 dias").
+Isso abre a janela do Electron com o dashboard: "Hoje", "Últimos 7 dias", "Limites" (defina um tempo máximo por app e receba uma notificação ao estourar) e "Conta" (login opcional para sincronizar com o Android).
 
 ### Gerar instalador
 
@@ -38,6 +38,11 @@ npm run dist
 - Electron + Vite + React + TypeScript
 - [`active-win`](https://www.npmjs.com/package/active-win) para detectar a janela ativa
 - Armazenamento local em JSON (sem dependências nativas compiladas)
+- [`@supabase/supabase-js`](https://supabase.com/docs/reference/javascript) para o sync opcional (aba "Conta")
+
+## Sincronização (opcional)
+
+Por padrão o app só grava dados localmente. Ao entrar com uma conta na aba "Conta", cada dispositivo envia o próprio uso (marcado como `desktop` ou `android`) para uma tabela no Supabase protegida por row level security — cada usuário só enxerga as próprias linhas. Clicar em "Sincronizar agora" envia os dados locais e baixa o total combinado de todos os dispositivos logados na mesma conta.
 
 ## Android
 
@@ -54,10 +59,11 @@ Abra a pasta `android/` no [Android Studio](https://developer.android.com/studio
 
 ## Roadmap
 
-- [ ] Sincronizar dados entre desktop e Android (hoje são independentes)
-- [ ] Limites diários de uso por app com notificação/bloqueio
-- [ ] Categorização de apps (produtividade, redes sociais, etc.)
-- [ ] Exportar dados (CSV/JSON)
+- [x] Limites diários de uso por app com notificação
+- [x] Categorização de apps (produtividade, redes sociais, etc.)
+- [x] Exportar dados (CSV/JSON)
+- [x] Sincronizar dados entre desktop e Android (via Supabase, opcional)
+- [ ] Bloqueio automático de apps ao estourar o limite (hoje só notifica)
 
 ## Licença
 

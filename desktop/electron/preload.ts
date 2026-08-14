@@ -20,6 +20,7 @@ export interface TodayUsage {
 const api = {
   getToday: (): Promise<TodayUsage> => ipcRenderer.invoke('usage:today'),
   getRange: (days: number): Promise<DayAppUsage[]> => ipcRenderer.invoke('usage:range', days),
+  getAllUsage: (): Promise<DayAppUsage[]> => ipcRenderer.invoke('usage:all'),
   getLimits: (): Promise<Record<string, number>> => ipcRenderer.invoke('limits:get'),
   setLimit: (appName: string, limitSeconds: number): Promise<void> =>
     ipcRenderer.invoke('limits:set', appName, limitSeconds),
