@@ -24,6 +24,9 @@ const api = {
   setLimit: (appName: string, limitSeconds: number): Promise<void> =>
     ipcRenderer.invoke('limits:set', appName, limitSeconds),
   deleteLimit: (appName: string): Promise<void> => ipcRenderer.invoke('limits:delete', appName),
+  getCategories: (): Promise<Record<string, string>> => ipcRenderer.invoke('categories:get'),
+  setCategory: (appName: string, category: string): Promise<void> =>
+    ipcRenderer.invoke('categories:set', appName, category),
 }
 
 contextBridge.exposeInMainWorld('openScreenTime', api)

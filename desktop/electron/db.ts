@@ -102,3 +102,31 @@ export function deleteLimit(appName: string) {
   delete limits[appName]
   persistLimits()
 }
+
+// Categories: { [appName]: categoryName }
+type CategoriesStore = Record<string, string>
+
+const categoriesPath = path.join(userDataDir, 'categories.json')
+
+function loadCategories(): CategoriesStore {
+  try {
+    return JSON.parse(fs.readFileSync(categoriesPath, 'utf-8'))
+  } catch {
+    return {}
+  }
+}
+
+let categories: CategoriesStore = loadCategories()
+
+function persistCategories() {
+  fs.writeFileSync(categoriesPath, JSON.stringify(categories), 'utf-8')
+}
+
+export function getCategories(): CategoriesStore {
+  return categories
+}
+
+export function setCategory(appName: string, category: string) {
+  categories[appName] = category
+  persistCategories()
+}

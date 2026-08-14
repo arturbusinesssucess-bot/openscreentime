@@ -11,12 +11,48 @@ function formatDuration(totalSeconds: number): string {
 
 const COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#f472b6', '#34d399', '#a78bfa', '#fb7185', '#60a5fa']
 
-function AppBar({ usage, max, color }: { usage: AppUsage; max: number; color: string }) {
+const CATEGORIES = ['Produtividade', 'Comunicação', 'Redes Sociais', 'Entretenimento', 'Desenvolvimento', 'Outros']
+const DEFAULT_CATEGORY = 'Outros'
+const CATEGORY_COLORS: Record<string, string> = {
+  Produtividade: '#34d399',
+  Comunicação: '#60a5fa',
+  'Redes Sociais': '#f472b6',
+  Entretenimento: '#f59e0b',
+  Desenvolvimento: '#6366f1',
+  Outros: '#8a8f9c',
+}
+
+function AppBar({
+  usage,
+  max,
+  color,
+  category,
+  onCategoryChange,
+}: {
+  usage: AppUsage
+  max: number
+  color: string
+  category?: string
+  onCategoryChange?: (category: string) => void
+}) {
   const pct = max > 0 ? Math.max((usage.seconds / max) * 100, 2) : 0
   return (
     <div className="app-row">
       <div className="app-row-header">
         <span className="app-name">{usage.app_name}</span>
+        {onCategoryChange && (
+          <select
+            className="category-select"
+            value={category ?? DEFAULT_CATEGORY}
+            onChange={(e) => onCategoryChange(e.target.value)}
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        )}
         <span className="app-time">{formatDuration(usage.seconds)}</span>
       </div>
       <div className="bar-track">
@@ -28,9 +64,11 @@ function AppBar({ usage, max, color }: { usage: AppUsage; max: number; color: st
 
 function TodayView() {
   const [data, setData] = useState<TodayUsage | null>(null)
+  const [categories, setCategories] = useState<Record<string, string>>({})
 
   const refresh = () => {
     window.openScreenTime.getToday().then(setData)
+    window.openScreenTime.getCategories().then(setCategories)
   }
 
   useEffect(() => {
@@ -38,6 +76,21 @@ function TodayView() {
     const id = setInterval(refresh, 5000)
     return () => clearInterval(id)
   }, [])
+
+  const handleCategoryChange = (appName: string, category: string) => {
+    setCategories((prev) => ({ ...prev, [appName]: category }))
+    window.openScreenTime.setCategory(appName, category)
+  }
+
+  const categoryTotals = useMemo(() => {
+    if (!data) return []
+    const totals = new Map<string, number>()
+    for (const a of data.apps) {
+      const cat = categories[a.app_name] ?? DEFAULT_CATEGORY
+      totals.set(cat, (totals.get(cat) ?? 0) + a.seconds)
+    }
+    return Array.from(totals.entries()).sort((a, b) => b[1] - a[1])
+  }, [data, categories])
 
   if (!data) return <p className="muted">Carregando...</p>
 
@@ -49,10 +102,44 @@ function TodayView() {
         <span className="total-label">Tempo de tela hoje</span>
         <span className="total-value">{formatDuration(data.total)}</span>
       </div>
+
+      {categoryTotals.length > 0 && (
+        <div className="history-bar-track category-summary-track">
+          {categoryTotals.map(([cat, seconds]) => (
+            <div
+              key={cat}
+              className="history-bar-segment"
+              title={`${cat}: ${formatDuration(seconds)}`}
+              style={{
+                width: `${(seconds / data.total) * 100}%`,
+                background: CATEGORY_COLORS[cat] ?? '#8a8f9c',
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {categoryTotals.length > 0 && (
+        <div className="category-legend">
+          {categoryTotals.map(([cat, seconds]) => (
+            <span key={cat} className="category-legend-item">
+              <span className="dot" style={{ background: CATEGORY_COLORS[cat] ?? '#8a8f9c' }} />
+              {cat} · {formatDuration(seconds)}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="app-list">
         {data.apps.length === 0 && <p className="muted">Nenhum uso registrado ainda hoje.</p>}
         {data.apps.map((a, i) => (
-          <AppBar key={a.app_name} usage={a} max={max} color={COLORS[i % COLORS.length]} />
+          <AppBar
+            key={a.app_name}
+            usage={a}
+            max={max}
+            color={COLORS[i % COLORS.length]}
+            category={categories[a.app_name]}
+            onCategoryChange={(cat) => handleCategoryChange(a.app_name, cat)}
+          />
         ))}
       </div>
     </div>

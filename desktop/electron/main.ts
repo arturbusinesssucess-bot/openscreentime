@@ -9,6 +9,8 @@ import {
   getLimits,
   setLimit,
   deleteLimit,
+  getCategories,
+  setCategory,
 } from './db.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -151,6 +153,12 @@ ipcMain.handle('limits:set', (_e, appName: string, limitSeconds: number) => {
 
 ipcMain.handle('limits:delete', (_e, appName: string) => {
   deleteLimit(appName)
+})
+
+ipcMain.handle('categories:get', () => getCategories())
+
+ipcMain.handle('categories:set', (_e, appName: string, category: string) => {
+  setCategory(appName, category)
 })
 
 app.whenReady().then(() => {
