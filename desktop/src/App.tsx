@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { AppUsage, DayAppUsage, TodayUsage } from '../electron/preload'
 import { supabase, pushLocalUsage, pullAllUsage, type RemoteUsageRow } from './supabase'
-import { TrendBarChart, AreaTrendChart, DonutChart } from './charts'
+import { AreaTrendChart, DonutChart } from './charts'
 
 function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600)
@@ -77,6 +77,93 @@ function IconUser() {
       <circle cx="8" cy="5.3" r="2.6" />
       <path d="M2.5 13.5c1-2.7 3.2-4 5.5-4s4.5 1.3 5.5 4" strokeLinecap="round" />
     </svg>
+  )
+}
+
+function IconClock() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <circle cx="8" cy="8" r="6.3" />
+      <path d="M8 4.6V8l2.6 1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function IconBolt() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8.8 1 3 9.2h3.4L6.2 15 13 6.4H9.4L8.8 1Z" />
+    </svg>
+  )
+}
+
+function IconWindow() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1.5" />
+      <path d="M1.5 5.5h13" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconLayers() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+      <path d="M8 1.8 14 5 8 8.2 2 5 8 1.8Z" />
+      <path d="m2 8 6 3.2L14 8" strokeLinecap="round" />
+      <path d="m2 11 6 3.2L14 11" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconArrow({ up }: { up: boolean }) {
+  return (
+    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" style={{ width: 9, height: 9 }}>
+      <path d={up ? 'M5 8.5V1.5M2 4.3 5 1.3l3 3' : 'M5 1.5v7M2 5.7 5 8.7l3-3'} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function DeltaPill({ value, invert = false }: { value: number; invert?: boolean }) {
+  if (value === 0) return <span className="delta-pill flat">— igual</span>
+  const positiveIsGood = invert ? value < 0 : value > 0
+  return (
+    <span className={`delta-pill ${positiveIsGood ? 'good' : 'bad'}`}>
+      <IconArrow up={value > 0} />
+      {Math.abs(Math.round(value))}%
+    </span>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  icon,
+  color,
+  delta,
+  invertDelta,
+}: {
+  label: string
+  value: string
+  sub?: string
+  icon: ReactNode
+  color: string
+  delta?: number
+  invertDelta?: boolean
+}) {
+  return (
+    <div className="stat-card">
+      <div className="stat-card-top">
+        <span className="stat-card-label">{label}</span>
+        <span className="stat-badge" style={{ background: `${color}22`, color }}>
+          {icon}
+        </span>
+      </div>
+      <span className="stat-card-value">{value}</span>
+      {sub && <span className="stat-card-sub">{sub}</span>}
+      {delta !== undefined && <DeltaPill value={delta} invert={invertDelta} />}
+    </div>
   )
 }
 
@@ -212,35 +299,43 @@ function DashboardView() {
 
   if (!today) return <EmptyState title="Carregando..." />
 
-  const delta = today.total - yesterdayTotal
+  const topApp = today.apps[0]
+  const produtividadeSeconds = categoryTotals.find((c) => c.label === 'Produtividade')?.value ?? 0
+  const deltaPct = yesterdayTotal > 0 ? ((today.total - yesterdayTotal) / yesterdayTotal) * 100 : 0
   const maxAppSeconds = today.apps[0]?.seconds ?? 0
 
   return (
     <div>
-      <div className="hero-card">
-        <div>
-          <span className="hero-label">Tempo de tela hoje</span>
-          <div className="hero-value">
-            {formatShort(today.total)}
-            <span className="unit">total</span>
-          </div>
-        </div>
-        <div className="hero-stats">
-          <div className="hero-stat">
-            <span className="k">vs. ontem</span>
-            <span className={`v ${delta > 0 ? 'up' : delta < 0 ? 'down' : ''}`}>
-              {delta === 0 ? '—' : `${delta > 0 ? '+' : ''}${formatShort(Math.abs(delta))}`}
-            </span>
-          </div>
-          <div className="hero-stat">
-            <span className="k">média 7 dias</span>
-            <span className="v">{formatShort(weekAverage)}</span>
-          </div>
-          <div className="hero-stat">
-            <span className="k">apps ativos</span>
-            <span className="v">{today.apps.length}</span>
-          </div>
-        </div>
+      <div className="stat-grid">
+        <StatCard
+          label="Tempo de tela hoje"
+          value={formatShort(today.total)}
+          sub={`média 7d ${formatShort(weekAverage)}`}
+          icon={<IconClock />}
+          color="#5b8dee"
+          delta={yesterdayTotal > 0 ? deltaPct : undefined}
+        />
+        <StatCard
+          label="Produtividade hoje"
+          value={formatShort(produtividadeSeconds)}
+          sub={today.total > 0 ? `${Math.round((produtividadeSeconds / today.total) * 100)}% do total` : undefined}
+          icon={<IconBolt />}
+          color="#34c98f"
+        />
+        <StatCard
+          label="App mais usado"
+          value={topApp ? topApp.app_name : '—'}
+          sub={topApp ? formatDuration(topApp.seconds) : undefined}
+          icon={<IconWindow />}
+          color="#e0a23d"
+        />
+        <StatCard
+          label="Apps ativos"
+          value={String(today.apps.length)}
+          sub="hoje"
+          icon={<IconLayers />}
+          color="#e2678a"
+        />
       </div>
 
       <div className="dashboard-grid">
@@ -250,7 +345,7 @@ function DashboardView() {
               <p className="panel-title">Tendência · 7 dias</p>
               <span className="panel-meta">{formatDuration(trendData.reduce((s, d) => s + d.value, 0))} total</span>
             </div>
-            <TrendBarChart data={trendData} formatValue={formatShort} />
+            <AreaTrendChart data={trendData} formatValue={formatShort} height={180} color="#5b8dee" gradientId="dashboardGradient" />
           </div>
 
           <div className="panel">
@@ -287,10 +382,7 @@ function DashboardView() {
               <EmptyState title="Sem dados" />
             ) : (
               <div className="donut-wrap">
-                <DonutChart
-                  segments={categoryTotals}
-                  centerLabel={formatShort(today.total)}
-                />
+                <DonutChart segments={categoryTotals} size={148} centerLabel={formatShort(today.total)} />
                 <div className="donut-legend">
                   {categoryTotals.map((c) => (
                     <div className="legend-row" key={c.key}>
@@ -356,11 +448,21 @@ function ReportView() {
   const [rows, setRows] = useState<DayAppUsage[]>([])
   const [categories, setCategories] = useState<Record<string, string>>({})
   const [exportStatus, setExportStatus] = useState('')
+  const [appSearch, setAppSearch] = useState('')
+  const [previousRows, setPreviousRows] = useState<DayAppUsage[]>([])
 
   useEffect(() => {
     window.openScreenTime.getRange(periodDays).then(setRows)
     window.openScreenTime.getCategories().then(setCategories)
+    window.openScreenTime.getRange(periodDays * 2).then((all) => {
+      const cutoff = new Date()
+      cutoff.setDate(cutoff.getDate() - periodDays)
+      const cutoffKey = cutoff.toISOString().slice(0, 10)
+      setPreviousRows(all.filter((r) => r.day < cutoffKey))
+    })
   }, [periodDays])
+
+  const previousTotal = useMemo(() => previousRows.reduce((s, r) => s + r.seconds, 0), [previousRows])
 
   const trendData = useMemo(() => {
     const byDay = new Map<string, number>()
@@ -390,6 +492,11 @@ function ReportView() {
       .map(([app_name, seconds]) => ({ app_name, seconds }))
       .sort((a, b) => b.seconds - a.seconds)
   }, [rows])
+
+  const filteredAppTotals = useMemo(
+    () => appTotals.filter((a) => a.app_name.toLowerCase().includes(appSearch.toLowerCase())),
+    [appTotals, appSearch],
+  )
 
   const categoryTotals = useMemo(() => {
     const map = new Map<string, number>()
@@ -437,26 +544,29 @@ function ReportView() {
         <EmptyState title="Sem dados nesse período" hint="Volte quando tiver mais uso registrado." />
       ) : (
         <>
-          <div className="hero-card">
-            <div>
-              <span className="hero-label">Total no período</span>
-              <div className="hero-value">
-                {formatShort(total)}
-                <span className="unit">{PERIODS.find((p) => p.key === periodDays)?.label}</span>
-              </div>
-            </div>
-            <div className="hero-stats">
-              <div className="hero-stat">
-                <span className="k">média diária</span>
-                <span className="v">{formatShort(dailyAverage)}</span>
-              </div>
-              <div className="hero-stat">
-                <span className="k">pico</span>
-                <span className="v">
-                  {formatShort(peakDay.value)} · {peakDay.label}
-                </span>
-              </div>
-            </div>
+          <div className="stat-grid">
+            <StatCard
+              label={`Total · ${PERIODS.find((p) => p.key === periodDays)?.label}`}
+              value={formatShort(total)}
+              icon={<IconClock />}
+              color="#5b8dee"
+              delta={previousTotal > 0 ? ((total - previousTotal) / previousTotal) * 100 : undefined}
+            />
+            <StatCard label="Média diária" value={formatShort(dailyAverage)} icon={<IconBolt />} color="#34c98f" />
+            <StatCard
+              label="Pico"
+              value={formatShort(peakDay.value)}
+              sub={peakDay.label}
+              icon={<IconWindow />}
+              color="#e0a23d"
+            />
+            <StatCard
+              label="App mais usado"
+              value={appTotals[0]?.app_name ?? '—'}
+              sub={appTotals[0] ? formatDuration(appTotals[0].seconds) : undefined}
+              icon={<IconLayers />}
+              color="#e2678a"
+            />
           </div>
 
           <div className="panel" style={{ marginBottom: 20 }}>
@@ -466,14 +576,24 @@ function ReportView() {
             <AreaTrendChart
               data={trendData}
               formatValue={formatShort}
+              color="#5b8dee"
+              gradientId="reportGradient"
               showEveryLabel={periodDays <= 7 ? 1 : periodDays <= 14 ? 2 : 5}
             />
           </div>
 
           <div className="dashboard-grid">
             <div className="panel">
-              <div className="panel-title-row">
-                <p className="panel-title">Ranking de apps</p>
+              <div className="table-toolbar">
+                <p className="panel-title" style={{ margin: 0 }}>
+                  Ranking de apps
+                </p>
+                <input
+                  className="search-input"
+                  placeholder="Buscar app..."
+                  value={appSearch}
+                  onChange={(e) => setAppSearch(e.target.value)}
+                />
               </div>
               <table className="data-table">
                 <thead>
@@ -484,7 +604,14 @@ function ReportView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {appTotals.slice(0, 10).map((a, i) => (
+                  {filteredAppTotals.length === 0 && (
+                    <tr>
+                      <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-faint)', padding: '20px 0' }}>
+                        Nenhum app encontrado
+                      </td>
+                    </tr>
+                  )}
+                  {filteredAppTotals.slice(0, 10).map((a, i) => (
                     <tr key={a.app_name}>
                       <td className="name">
                         <span className="row-dot" style={{ background: APP_COLORS[i % APP_COLORS.length] }} />
@@ -569,9 +696,25 @@ function LimitsView() {
   }
 
   const limitEntries = Object.entries(limits)
+  const todayTotal = todayApps.reduce((s, a) => s + a.seconds, 0)
+  const nearLimitCount = limitEntries.filter(([app, limit]) => {
+    const used = usageByApp.get(app) ?? 0
+    return used / limit >= 0.7 && used < limit
+  }).length
 
   return (
-    <div className="panel">
+    <div>
+      <div className="stat-grid">
+        <StatCard label="Tempo de tela hoje" value={formatShort(todayTotal)} icon={<IconClock />} color="#5b8dee" />
+        <StatCard label="Limites ativos" value={String(limitEntries.length)} icon={<IconGauge />} color="#34c98f" />
+        <StatCard
+          label="Próximo do limite"
+          value={String(nearLimitCount)}
+          icon={<IconWindow />}
+          color={nearLimitCount > 0 ? '#e0a23d' : '#8a8375'}
+        />
+      </div>
+      <div className="panel">
       <div className="limit-add-row">
         <div className="field">
           <label>App</label>
@@ -634,6 +777,7 @@ function LimitsView() {
           })}
         </div>
       )}
+      </div>
     </div>
   )
 }

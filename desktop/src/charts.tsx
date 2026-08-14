@@ -1,84 +1,31 @@
 // Lightweight inline-SVG charts — no charting library dependency,
 // full control over the "precision dark" aesthetic.
 
-export interface TrendPoint {
-  key: string
-  label: string
-  value: number
-  highlight?: boolean
-}
-
-export function TrendBarChart({
-  data,
-  formatValue,
-  height = 176,
-}: {
-  data: TrendPoint[]
-  formatValue: (v: number) => string
-  height?: number
-}) {
-  const width = 100 * data.length
-  const max = Math.max(...data.map((d) => d.value), 1)
-  const topPad = 22
-  const bottomPad = 20
-  const chartH = height - topPad - bottomPad
-  const barW = 64
-  const gap = 100 - barW
-
-  return (
-    <svg
-      className="trend-chart"
-      viewBox={`0 0 ${width} ${height}`}
-      width="100%"
-      height={height}
-      preserveAspectRatio="none"
-    >
-      {data.map((d, i) => {
-        const h = max > 0 ? (d.value / max) * chartH : 0
-        const x = i * 100 + gap / 2
-        const y = topPad + (chartH - h)
-        return (
-          <g key={d.key} className={`trend-bar-group${d.highlight ? ' today' : ''}`}>
-            <title>{`${d.label}: ${formatValue(d.value)}`}</title>
-            {d.value > 0 && (
-              <text
-                x={x + barW / 2}
-                y={y - 7}
-                textAnchor="middle"
-                className="trend-value-label"
-              >
-                {formatValue(d.value)}
-              </text>
-            )}
-            <rect
-              className="trend-bar-fill"
-              x={x}
-              y={y}
-              width={barW}
-              height={Math.max(h, 3)}
-              rx={5}
-              fill={d.highlight ? 'var(--accent)' : 'var(--surface-2)'}
-              stroke={d.highlight ? 'none' : 'var(--border)'}
-            />
-            <text
-              x={x + barW / 2}
-              y={height - 4}
-              textAnchor="middle"
-              className="trend-axis-label"
-            >
-              {d.label}
-            </text>
-          </g>
-        )
-      })}
-    </svg>
-  )
-}
-
 export interface AreaPoint {
   key: string
   label: string
   value: number
+}
+
+// Catmull-Rom -> cubic Bezier, so the line reads as a smooth glowing
+// curve instead of a jagged polyline.
+function smoothPath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return ''
+  if (points.length === 1) return `M${points[0].x},${points[0].y}`
+
+  let d = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i]
+    const p1 = points[i]
+    const p2 = points[i + 1]
+    const p3 = points[i + 2] ?? p2
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = p1.y + (p2.y - p0.y) / 6
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = p2.y - (p3.y - p1.y) / 6
+    d += ` C${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+  }
+  return d
 }
 
 export function AreaTrendChart({
@@ -86,17 +33,23 @@ export function AreaTrendChart({
   formatValue,
   height = 220,
   showEveryLabel = 5,
+  color = 'var(--accent)',
+  gradientId = 'areaGradient',
+  showLabels = true,
 }: {
   data: AreaPoint[]
   formatValue: (v: number) => string
   height?: number
   showEveryLabel?: number
+  color?: string
+  gradientId?: string
+  showLabels?: boolean
 }) {
   const width = 720
   const leftPad = 8
   const rightPad = 8
-  const topPad = 20
-  const bottomPad = 26
+  const topPad = 16
+  const bottomPad = showLabels ? 26 : 6
   const chartW = width - leftPad - rightPad
   const chartH = height - topPad - bottomPad
   const max = Math.max(...data.map((d) => d.value), 1)
@@ -108,12 +61,13 @@ export function AreaTrendChart({
     return { x, y, d }
   })
 
-  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-  const areaPath = `${linePath} L${points[points.length - 1]?.x ?? 0},${topPad + chartH} L${points[0]?.x ?? 0},${
-    topPad + chartH
-  } Z`
+  const linePath = smoothPath(points)
+  const last = points[points.length - 1]
+  const first = points[0]
+  const areaPath = `${linePath} L${(last?.x ?? 0).toFixed(1)},${(topPad + chartH).toFixed(1)} L${(first?.x ?? 0).toFixed(1)},${(topPad + chartH).toFixed(1)} Z`
 
-  const gridLines = [0.25, 0.5, 0.75].map((f) => topPad + chartH * f)
+  const gridLines = [0, 0.33, 0.66, 1].map((f) => topPad + chartH * f)
+  const dotStride = points.length <= 10 ? 1 : Math.ceil(points.length / 10)
 
   return (
     <svg
@@ -124,9 +78,9 @@ export function AreaTrendChart({
       preserveAspectRatio="none"
     >
       <defs>
-        <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.32} />
-          <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity={0.38} />
+          <stop offset="100%" stopColor={color} stopOpacity={0} />
         </linearGradient>
       </defs>
 
@@ -134,14 +88,16 @@ export function AreaTrendChart({
         <line key={i} x1={leftPad} x2={width - rightPad} y1={y} y2={y} className="area-chart-grid" />
       ))}
 
-      <path d={areaPath} className="area-chart-fill" />
-      <path d={linePath} className="area-chart-line" />
+      <path d={areaPath} fill={`url(#${gradientId})`} />
+      <path d={linePath} className="area-chart-line" stroke={color} style={{ filter: `drop-shadow(0 0 5px ${color})` }} />
 
       {points.map((p, i) => (
         <g key={p.d.key}>
-          {p.d.value > 0 && <circle cx={p.x} cy={p.y} r={2.5} className="area-chart-dot" />}
+          {p.d.value > 0 && i % dotStride === 0 && (
+            <circle cx={p.x} cy={p.y} r={3.2} className="area-chart-dot" stroke={color} />
+          )}
           <title>{`${p.d.label}: ${formatValue(p.d.value)}`}</title>
-          {i % showEveryLabel === 0 && (
+          {showLabels && i % showEveryLabel === 0 && (
             <text x={p.x} y={height - 6} textAnchor="middle" className="trend-axis-label">
               {p.d.label}
             </text>
