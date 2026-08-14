@@ -55,7 +55,21 @@ fun OpenScreenTimeApp(repository: UsageStatsRepository) {
             onGranted = { hasAccess = true },
         )
     } else {
-        UsageDashboard(usage = usage, onRefresh = { usage = repository.getTodayUsage() })
+        var tab by remember { mutableIntStateOf(0) }
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            TabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Uso") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Conta") })
+            }
+            Box(modifier = Modifier.weight(1f)) {
+                if (tab == 0) {
+                    UsageDashboard(usage = usage, onRefresh = { usage = repository.getTodayUsage() })
+                } else {
+                    AccountScreen(todayUsage = usage)
+                }
+            }
+        }
     }
 }
 

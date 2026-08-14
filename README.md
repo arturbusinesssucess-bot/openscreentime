@@ -46,7 +46,9 @@ Por padrão o app só grava dados localmente. Ao entrar com uma conta na aba "Co
 
 ## Android
 
-Usa a API `UsageStatsManager` do Android (a mesma que o app nativo de "Bem-estar digital" usa) para mostrar o tempo de uso de cada app hoje. Não precisa de serviço de acessibilidade nem root — só a permissão "Acesso a dados de uso", concedida manualmente em Ajustes.
+Usa a API `UsageStatsManager` do Android (a mesma que o app nativo de "Bem-estar digital" usa) para mostrar o tempo de uso de cada app hoje. Não precisa de serviço de acessibilidade nem root — só a permissão "Acesso a dados de uso", concedida manualmente em Ajustes. Tem a mesma aba "Conta" do desktop para sincronizar com a mesma conta.
+
+> **Nota:** o código do Android foi escrito mas **não foi compilado nem testado** — não há Android SDK/Gradle disponível na máquina onde este projeto foi desenvolvido. Ao abrir no Android Studio, revise principalmente `SyncRepository.kt` (API do supabase-kt) antes de confiar no build.
 
 ### Build
 
@@ -55,7 +57,8 @@ Abra a pasta `android/` no [Android Studio](https://developer.android.com/studio
 ### Stack
 
 - Kotlin + Jetpack Compose + Material 3
-- `UsageStatsManager` (nenhuma dependência de terceiros)
+- `UsageStatsManager` (sem dependências de terceiros para o rastreamento)
+- [`supabase-kt`](https://github.com/supabase-community/supabase-kt) para o sync opcional (aba "Conta")
 
 ## Roadmap
 
