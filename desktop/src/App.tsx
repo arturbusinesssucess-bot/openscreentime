@@ -996,40 +996,12 @@ function DeviceSummary({ rows }: { rows: RemoteUsageRow[] }) {
   )
 }
 
-function AccountView() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [loadingSession, setLoadingSession] = useState(true)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [authError, setAuthError] = useState('')
+function AccountView({ session }: { session: Session }) {
   const [syncStatus, setSyncStatus] = useState('')
   const [remoteRows, setRemoteRows] = useState<RemoteUsageRow[]>([])
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoadingSession(false)
-    })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
-    return () => sub.subscription.unsubscribe()
-  }, [])
-
-  const handleSignIn = async () => {
-    setAuthError('')
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) setAuthError(error.message)
-  }
-
-  const handleSignUp = async () => {
-    setAuthError('')
-    const { error } = await supabase.auth.signUp({ email, password })
-    if (error) setAuthError(error.message)
-    else setAuthError('Conta criada. Verifique seu e-mail se a confirmação estiver ativada, ou já entre normalmente.')
-  }
-
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    setRemoteRows([])
   }
 
   const handleSync = async () => {
@@ -1043,42 +1015,6 @@ function AccountView() {
     } catch (err) {
       setSyncStatus(`Erro: ${err instanceof Error ? err.message : String(err)}`)
     }
-  }
-
-  if (loadingSession) return <EmptyState title="Carregando..." />
-
-  if (!session) {
-    return (
-      <div className="panel">
-        <div className="auth-card">
-          <p className="muted">
-            Entre com uma conta pra sincronizar o uso do desktop com o app Android e ver o tempo combinado.
-          </p>
-          <div className="field">
-            <label>E-mail</label>
-            <input type="email" placeholder="voce@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </div>
-          <div className="field">
-            <label>Senha</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          <div className="btn-row">
-            <button className="btn btn-primary" onClick={handleSignIn}>
-              Entrar
-            </button>
-            <button className="btn btn-ghost" onClick={handleSignUp}>
-              Criar conta
-            </button>
-          </div>
-          {authError && <p className="status-line error">{authError}</p>}
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -1100,6 +1036,91 @@ function AccountView() {
   )
 }
 
+// ---------- Auth gate ----------
+
+function LoginScreen() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: { preventDefault: () => void }) => {
+    e.preventDefault()
+    setError('')
+    setInfo('')
+    setLoading(true)
+    const { error: authError } =
+      mode === 'signin'
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password })
+    setLoading(false)
+    if (authError) {
+      setError(authError.message)
+    } else if (mode === 'signup') {
+      setInfo('Conta criada. Se a confirmação por e-mail estiver ativada, verifique sua caixa de entrada; senão, já é possível entrar.')
+    }
+  }
+
+  return (
+    <div className="auth-screen">
+      <form className="auth-screen-card" onSubmit={handleSubmit}>
+        <div className="sidebar-brand" style={{ marginBottom: 24, padding: 0 }}>
+          <span className="mark" />
+          <span className="name">OpenScreenTime</span>
+        </div>
+        <h2 className="auth-screen-title">{mode === 'signin' ? 'Entrar na sua conta' : 'Criar conta'}</h2>
+        <p className="muted" style={{ marginBottom: 20 }}>
+          Sua conta sincroniza o tempo de tela entre este computador e o app Android.
+        </p>
+
+        <div className="field">
+          <label>E-mail</label>
+          <input
+            type="email"
+            required
+            placeholder="voce@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+        <div className="field" style={{ marginTop: 12 }}>
+          <label>Senha</label>
+          <input
+            type="password"
+            required
+            minLength={6}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+
+        {error && <p className="status-line error" style={{ marginTop: 14 }}>{error}</p>}
+        {info && <p className="status-line" style={{ marginTop: 14 }}>{info}</p>}
+
+        <button className="btn btn-primary" type="submit" disabled={loading} style={{ marginTop: 20, width: '100%' }}>
+          {loading ? 'Aguarde...' : mode === 'signin' ? 'Entrar' : 'Criar conta'}
+        </button>
+
+        <button
+          type="button"
+          className="btn-text"
+          style={{ marginTop: 14, alignSelf: 'center' }}
+          onClick={() => {
+            setMode(mode === 'signin' ? 'signup' : 'signin')
+            setError('')
+            setInfo('')
+          }}
+        >
+          {mode === 'signin' ? 'Não tem conta? Criar uma' : 'Já tem conta? Entrar'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 // ---------- App shell ----------
 
 const NAV = [
@@ -1115,11 +1136,33 @@ const PAGE_META: Record<TabKey, { title: string; subtitle: string }> = {
   dashboard: { title: 'Dashboard', subtitle: 'Visão geral do seu tempo de tela hoje' },
   report: { title: 'Relatório', subtitle: 'Tendências e comparativos por período' },
   limits: { title: 'Limites', subtitle: 'Defina um teto diário por aplicativo' },
-  account: { title: 'Conta', subtitle: 'Sincronize com o app Android' },
+  account: { title: 'Conta', subtitle: 'Sua conta e sincronização com o app Android' },
 }
 
 export default function App() {
   const [tab, setTab] = useState<TabKey>('dashboard')
+  const [session, setSession] = useState<Session | null>(null)
+  const [loadingSession, setLoadingSession] = useState(true)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoadingSession(false)
+    })
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    return () => sub.subscription.unsubscribe()
+  }, [])
+
+  if (loadingSession) {
+    return (
+      <div className="auth-screen">
+        <span className="muted">Carregando...</span>
+      </div>
+    )
+  }
+
+  if (!session) return <LoginScreen />
+
   const meta = PAGE_META[tab]
 
   return (
@@ -1153,7 +1196,7 @@ export default function App() {
         {tab === 'dashboard' && <DashboardView />}
         {tab === 'report' && <ReportView />}
         {tab === 'limits' && <LimitsView />}
-        {tab === 'account' && <AccountView />}
+        {tab === 'account' && <AccountView session={session} />}
       </main>
     </div>
   )

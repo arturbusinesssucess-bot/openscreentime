@@ -40,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun OpenScreenTimeApp(repository: UsageStatsRepository) {
+    var signedIn by remember { mutableStateOf(SyncRepository.isSignedIn()) }
     var hasAccess by remember { mutableStateOf(repository.hasUsageAccess()) }
     var usage by remember { mutableStateOf(listOf<AppUsageEntry>()) }
 
@@ -49,7 +50,9 @@ fun OpenScreenTimeApp(repository: UsageStatsRepository) {
         }
     }
 
-    if (!hasAccess) {
+    if (!signedIn) {
+        AccountScreen(todayUsage = emptyList(), onAuthChanged = { signedIn = SyncRepository.isSignedIn() })
+    } else if (!hasAccess) {
         PermissionRequestScreen(
             repository = repository,
             onGranted = { hasAccess = true },
@@ -66,7 +69,7 @@ fun OpenScreenTimeApp(repository: UsageStatsRepository) {
                 if (tab == 0) {
                     UsageDashboard(usage = usage, onRefresh = { usage = repository.getTodayUsage() })
                 } else {
-                    AccountScreen(todayUsage = usage)
+                    AccountScreen(todayUsage = usage, onAuthChanged = { signedIn = SyncRepository.isSignedIn() })
                 }
             }
         }

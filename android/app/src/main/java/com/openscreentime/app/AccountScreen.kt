@@ -17,7 +17,7 @@ private fun todayKey(): String =
     SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
 @Composable
-fun AccountScreen(todayUsage: List<AppUsageEntry>) {
+fun AccountScreen(todayUsage: List<AppUsageEntry>, onAuthChanged: () -> Unit = {}) {
     val scope = rememberCoroutineScope()
     var signedIn by remember { mutableStateOf(SyncRepository.isSignedIn()) }
     var email by remember { mutableStateOf("") }
@@ -56,6 +56,7 @@ fun AccountScreen(todayUsage: List<AppUsageEntry>) {
                         try {
                             SyncRepository.signIn(email, password)
                             signedIn = true
+                            onAuthChanged()
                         } catch (e: Exception) {
                             statusMessage = e.message ?: "Erro ao entrar"
                         }
@@ -69,6 +70,7 @@ fun AccountScreen(todayUsage: List<AppUsageEntry>) {
                             SyncRepository.signUp(email, password)
                             signedIn = SyncRepository.isSignedIn()
                             if (!signedIn) statusMessage = "Conta criada. Confirme o e-mail e entre."
+                            else onAuthChanged()
                         } catch (e: Exception) {
                             statusMessage = e.message ?: "Erro ao criar conta"
                         }
@@ -112,6 +114,7 @@ fun AccountScreen(todayUsage: List<AppUsageEntry>) {
                         SyncRepository.signOut()
                         signedIn = false
                         remoteRows = emptyList()
+                        onAuthChanged()
                     }
                 }) {
                     Text("Sair")

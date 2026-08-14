@@ -941,11 +941,31 @@ input.input {
 
 /* ---------- Account / auth ---------- */
 
-.auth-card {
-  max-width: 360px;
+.auth-screen {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 30% 20%, #201a10 0%, var(--bg) 55%);
+}
+
+.auth-screen-card {
+  width: 380px;
+  max-width: calc(100vw - 48px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  padding: 32px 30px;
+}
+
+.auth-screen-title {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 500;
+  margin: 0 0 6px;
 }
 
 .status-line {

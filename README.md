@@ -1,6 +1,6 @@
 # OpenScreenTime
 
-App de código aberto para acompanhar quanto tempo você passa no computador e no celular, app por app — no estilo StayFree / RescueTime / Scolect. Local-first por padrão (os dados ficam só no seu dispositivo); sincronizar entre desktop e Android é opcional, via login.
+App de código aberto para acompanhar quanto tempo você passa no computador e no celular, app por app — no estilo StayFree / RescueTime / Scolect. É preciso criar uma conta (e-mail/senha via Supabase) para usar o app; isso é o que permite sincronizar o tempo de tela entre o desktop e o Android na mesma conta. O rastreamento em si continua todo local — a conta só existe para sincronização.
 
 ## Estrutura do repositório
 
@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Isso abre a janela do Electron com o dashboard: "Hoje", "Últimos 7 dias", "Limites" (defina um tempo máximo por app e receba uma notificação ao estourar) e "Conta" (login opcional para sincronizar com o Android).
+Isso abre a janela do Electron pedindo login/criação de conta. Depois de entrar, o dashboard tem: "Dashboard" (visão geral do dia), "Relatório" (tendências por período), "Limites" (defina um tempo máximo por app e receba uma notificação ao estourar) e "Conta" (sincronizar com o Android, sair).
 
 ### Gerar instalador
 
@@ -38,15 +38,15 @@ npm run dist
 - Electron + Vite + React + TypeScript
 - [`active-win`](https://www.npmjs.com/package/active-win) para detectar a janela ativa
 - Armazenamento local em JSON (sem dependências nativas compiladas)
-- [`@supabase/supabase-js`](https://supabase.com/docs/reference/javascript) para o sync opcional (aba "Conta")
+- [`@supabase/supabase-js`](https://supabase.com/docs/reference/javascript) para autenticação e sincronização
 
-## Sincronização (opcional)
+## Conta e sincronização
 
-Por padrão o app só grava dados localmente. Ao entrar com uma conta na aba "Conta", cada dispositivo envia o próprio uso (marcado como `desktop` ou `android`) para uma tabela no Supabase protegida por row level security — cada usuário só enxerga as próprias linhas. Clicar em "Sincronizar agora" envia os dados locais e baixa o total combinado de todos os dispositivos logados na mesma conta.
+O app exige login (e-mail/senha) antes de mostrar o dashboard — é a mesma conta usada nos dois dispositivos. O rastreamento continua 100% local (dados em `usage.json`); a conta só é usada para autenticação e, quando você clica em "Sincronizar agora" na aba "Conta", para enviar/baixar os totais de uso (marcados como `desktop` ou `android`) de uma tabela no Supabase protegida por row level security — cada usuário só enxerga as próprias linhas.
 
 ## Android
 
-Usa a API `UsageStatsManager` do Android (a mesma que o app nativo de "Bem-estar digital" usa) para mostrar o tempo de uso de cada app hoje. Não precisa de serviço de acessibilidade nem root — só a permissão "Acesso a dados de uso", concedida manualmente em Ajustes. Tem a mesma aba "Conta" do desktop para sincronizar com a mesma conta.
+Usa a API `UsageStatsManager` do Android (a mesma que o app nativo de "Bem-estar digital" usa) para mostrar o tempo de uso de cada app hoje. Não precisa de serviço de acessibilidade nem root — só a permissão "Acesso a dados de uso", concedida manualmente em Ajustes. Também exige login (mesma conta do desktop) e tem a aba "Conta" para sincronizar.
 
 > **Nota:** o código do Android foi escrito mas **não foi compilado nem testado** — não há Android SDK/Gradle disponível na máquina onde este projeto foi desenvolvido. Ao abrir no Android Studio, revise principalmente `SyncRepository.kt` (API do supabase-kt) antes de confiar no build.
 
@@ -58,14 +58,14 @@ Abra a pasta `android/` no [Android Studio](https://developer.android.com/studio
 
 - Kotlin + Jetpack Compose + Material 3
 - `UsageStatsManager` (sem dependências de terceiros para o rastreamento)
-- [`supabase-kt`](https://github.com/supabase-community/supabase-kt) para o sync opcional (aba "Conta")
+- [`supabase-kt`](https://github.com/supabase-community/supabase-kt) para autenticação e sincronização
 
 ## Roadmap
 
 - [x] Limites diários de uso por app com notificação
 - [x] Categorização de apps (produtividade, redes sociais, etc.)
 - [x] Exportar dados (CSV/JSON)
-- [x] Sincronizar dados entre desktop e Android (via Supabase, opcional)
+- [x] Login obrigatório + sincronizar dados entre desktop e Android (via Supabase)
 - [ ] Bloqueio automático de apps ao estourar o limite (hoje só notifica)
 
 ## Licença
