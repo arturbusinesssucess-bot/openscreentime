@@ -1,0 +1,19 @@
+# Desktop (Node/Electron)
+desktop/node_modules/
+desktop/dist/
+desktop/dist-electron/
+desktop/release/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/captures/
+android/.cxx/
+
+# OS
+.DS_Store
+Thumbs.db
