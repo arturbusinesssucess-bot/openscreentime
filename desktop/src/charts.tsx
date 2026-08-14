@@ -173,3 +173,53 @@ export function DonutChart({
     </svg>
   )
 }
+
+export function RadialGauge({
+  percent,
+  color,
+  size = 104,
+  label,
+}: {
+  percent: number
+  color: string
+  size?: number
+  label: string
+}) {
+  const clamped = Math.max(0, Math.min(100, percent))
+  const radius = size / 2 - 9
+  const circumference = 2 * Math.PI * radius
+  const dash = (clamped / 100) * circumference
+
+  return (
+    <div className="radial-gauge">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <g transform={`translate(${size / 2}, ${size / 2}) rotate(-90)`}>
+          <circle r={radius} fill="none" stroke="var(--surface-2)" strokeWidth={9} />
+          {clamped > 0 && (
+            <circle
+              r={radius}
+              fill="none"
+              stroke={color}
+              strokeWidth={9}
+              strokeDasharray={`${dash} ${circumference}`}
+              strokeLinecap="round"
+            />
+          )}
+        </g>
+        <text
+          x="50%"
+          y="50%"
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontFamily="var(--font-sans)"
+          fontWeight={600}
+          fontSize="20"
+          fill="var(--text)"
+        >
+          {Math.round(clamped)}%
+        </text>
+      </svg>
+      <span className="radial-gauge-label">{label}</span>
+    </div>
+  )
+}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { AppUsage, DayAppUsage, TodayUsage } from '../electron/preload'
 import { supabase, pushLocalUsage, pullAllUsage, type RemoteUsageRow } from './supabase'
-import { AreaTrendChart, DonutChart } from './charts'
+import { AreaTrendChart, DonutChart, RadialGauge } from './charts'
 
 function formatDuration(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600)
@@ -112,6 +112,36 @@ function IconLayers() {
       <path d="M8 1.8 14 5 8 8.2 2 5 8 1.8Z" />
       <path d="m2 8 6 3.2L14 8" strokeLinecap="round" />
       <path d="m2 11 6 3.2L14 11" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function IconCalendarCheck() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="2.8" width="13" height="11.5" rx="1.5" />
+      <path d="M1.5 6h13M4.5 1.5v2.5M11.5 1.5v2.5" />
+      <path d="m5.6 9.6 1.6 1.6 3.2-3.4" />
+    </svg>
+  )
+}
+
+function IconCalendarWarning() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="2.8" width="13" height="11.5" rx="1.5" />
+      <path d="M1.5 6h13M4.5 1.5v2.5M11.5 1.5v2.5" />
+      <path d="M8 8v2.3" />
+      <circle cx="8" cy="11.9" r="0.15" fill="currentColor" />
+    </svg>
+  )
+}
+
+function IconEyeOff() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 8s2.4-4.5 6-4.5S14 8 14 8s-2.4 4.5-6 4.5S2 8 2 8Z" />
+      <circle cx="8" cy="8" r="2" />
     </svg>
   )
 }
@@ -227,15 +257,20 @@ function EmptyState({ title, hint }: { title: string; hint?: string }) {
 
 // ---------- Dashboard ----------
 
+const WEEKDAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado']
+const DISTRACTION_CATEGORIES = ['Redes Sociais', 'Entretenimento']
+
 function DashboardView() {
   const [today, setToday] = useState<TodayUsage | null>(null)
   const [range, setRange] = useState<DayAppUsage[]>([])
+  const [history, setHistory] = useState<DayAppUsage[]>([])
   const [categories, setCategories] = useState<Record<string, string>>({})
   const [limits, setLimits] = useState<Record<string, number>>({})
 
   const refresh = () => {
     window.openScreenTime.getToday().then(setToday)
     window.openScreenTime.getRange(7).then(setRange)
+    window.openScreenTime.getRange(30).then(setHistory)
     window.openScreenTime.getCategories().then(setCategories)
     window.openScreenTime.getLimits().then(setLimits)
   }
@@ -296,6 +331,60 @@ function DashboardView() {
       .filter((l) => l.seconds / l.limit >= 0.7)
       .sort((a, b) => b.seconds / b.limit - a.seconds / a.limit)
   }, [today, limits])
+
+  const patterns = useMemo(() => {
+    const perDay = new Map<string, number>()
+    for (const r of history) perDay.set(r.day, (perDay.get(r.day) ?? 0) + r.seconds)
+    const distinctDays = perDay.size
+    if (distinctDays < 3) return null
+
+    const byWeekday = new Map<number, number[]>()
+    for (const [day, seconds] of perDay) {
+      const weekday = new Date(day + 'T00:00:00').getDay()
+      const arr = byWeekday.get(weekday) ?? []
+      arr.push(seconds)
+      byWeekday.set(weekday, arr)
+    }
+    const weekdayAverages = Array.from(byWeekday.entries()).map(([weekday, values]) => ({
+      weekday,
+      avg: values.reduce((s, v) => s + v, 0) / values.length,
+    }))
+    const bestDay = weekdayAverages.reduce((min, d) => (d.avg < min.avg ? d : min), weekdayAverages[0])
+    const busiestDay = weekdayAverages.reduce((max, d) => (d.avg > max.avg ? d : max), weekdayAverages[0])
+
+    const avgDaily = Array.from(perDay.values()).reduce((s, v) => s + v, 0) / distinctDays
+
+    const distractionTotals = new Map<string, number>()
+    for (const r of history) {
+      const cat = categories[r.app_name] ?? DEFAULT_CATEGORY
+      if (DISTRACTION_CATEGORIES.includes(cat)) {
+        distractionTotals.set(r.app_name, (distractionTotals.get(r.app_name) ?? 0) + r.seconds)
+      }
+    }
+    const topDistraction = Array.from(distractionTotals.entries()).sort((a, b) => b[1] - a[1])[0]
+
+    return {
+      bestDay: WEEKDAY_NAMES[bestDay.weekday],
+      busiestDay: WEEKDAY_NAMES[busiestDay.weekday],
+      avgDaily,
+      topDistraction,
+      sampleDays: distinctDays,
+    }
+  }, [history, categories])
+
+  const weekGauges = useMemo(() => {
+    const weekTotal = range.reduce((s, r) => s + r.seconds, 0)
+    const weekProd = range
+      .filter((r) => (categories[r.app_name] ?? DEFAULT_CATEGORY) === 'Produtividade')
+      .reduce((s, r) => s + r.seconds, 0)
+    const prodPct = weekTotal > 0 ? (weekProd / weekTotal) * 100 : 0
+
+    const limitPairs = range.filter((r) => limits[r.app_name])
+    const withinCount = limitPairs.filter((r) => r.seconds <= limits[r.app_name]).length
+    const adherencePct = limitPairs.length > 0 ? (withinCount / limitPairs.length) * 100 : null
+
+    return { weekTotal, prodPct, adherencePct }
+  }, [range, categories, limits])
 
   if (!today) return <EmptyState title="Carregando..." />
 
@@ -426,6 +515,81 @@ function DashboardView() {
                     </span>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="dashboard-grid">
+        <div className="panel">
+          <div className="panel-title-row">
+            <p className="panel-title">Padrões de uso</p>
+            {patterns && <span className="panel-meta">{patterns.sampleDays} dias analisados</span>}
+          </div>
+          {!patterns ? (
+            <EmptyState title="Ainda sem dados suficientes" hint="Volte em alguns dias para ver seus padrões." />
+          ) : (
+            <div className="pattern-list">
+              <div className="pattern-row">
+                <span className="stat-badge" style={{ background: '#34c98f22', color: '#34c98f' }}>
+                  <IconCalendarCheck />
+                </span>
+                <div className="pattern-row-body">
+                  <span className="pattern-row-label">Dia mais leve</span>
+                  <span className="pattern-row-value">{patterns.bestDay}</span>
+                </div>
+              </div>
+              <div className="pattern-row">
+                <span className="stat-badge" style={{ background: '#e0a23d22', color: '#e0a23d' }}>
+                  <IconCalendarWarning />
+                </span>
+                <div className="pattern-row-body">
+                  <span className="pattern-row-label">Dia mais cheio</span>
+                  <span className="pattern-row-value">{patterns.busiestDay}</span>
+                </div>
+              </div>
+              <div className="pattern-row">
+                <span className="stat-badge" style={{ background: '#5b8dee22', color: '#5b8dee' }}>
+                  <IconClock />
+                </span>
+                <div className="pattern-row-body">
+                  <span className="pattern-row-label">Média diária (30 dias)</span>
+                  <span className="pattern-row-value">{formatShort(patterns.avgDaily)}</span>
+                </div>
+              </div>
+              <div className="pattern-row">
+                <span className="stat-badge" style={{ background: '#e2678a22', color: '#e2678a' }}>
+                  <IconEyeOff />
+                </span>
+                <div className="pattern-row-body">
+                  <span className="pattern-row-label">Maior distração</span>
+                  <span className="pattern-row-value">
+                    {patterns.topDistraction
+                      ? `${patterns.topDistraction[0]} · ${formatDuration(patterns.topDistraction[1])}`
+                      : 'Nenhuma categorizada'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="panel">
+          <div className="panel-title-row">
+            <p className="panel-title">Esta semana</p>
+          </div>
+          <p className="week-summary">
+            <strong>{formatDuration(weekGauges.weekTotal)}</strong> de tela nos últimos 7 dias.
+          </p>
+          <div className="radial-gauge-row">
+            <RadialGauge percent={weekGauges.prodPct} color="#34c98f" label="Tempo produtivo da semana" />
+            {weekGauges.adherencePct !== null ? (
+              <RadialGauge percent={weekGauges.adherencePct} color="#5b8dee" label="Dentro do limite" />
+            ) : (
+              <div className="radial-gauge">
+                <div className="radial-gauge-empty">—</div>
+                <span className="radial-gauge-label">Configure um limite para ver esta métrica</span>
               </div>
             )}
           </div>
