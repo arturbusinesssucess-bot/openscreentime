@@ -109,8 +109,102 @@ function HistoryView() {
   )
 }
 
+function LimitsView() {
+  const [limits, setLimits] = useState<Record<string, number>>({})
+  const [todayApps, setTodayApps] = useState<AppUsage[]>([])
+  const [selectedApp, setSelectedApp] = useState('')
+  const [minutes, setMinutes] = useState('')
+
+  const refresh = () => {
+    window.openScreenTime.getLimits().then(setLimits)
+    window.openScreenTime.getToday().then((d) => setTodayApps(d.apps))
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  const usageByApp = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const a of todayApps) map.set(a.app_name, a.seconds)
+    return map
+  }, [todayApps])
+
+  const handleSave = async () => {
+    const mins = Number(minutes)
+    if (!selectedApp || !mins || mins <= 0) return
+    await window.openScreenTime.setLimit(selectedApp, mins * 60)
+    setSelectedApp('')
+    setMinutes('')
+    refresh()
+  }
+
+  const handleDelete = async (appName: string) => {
+    await window.openScreenTime.deleteLimit(appName)
+    refresh()
+  }
+
+  const limitEntries = Object.entries(limits)
+
+  return (
+    <div>
+      <div className="limit-form">
+        <select value={selectedApp} onChange={(e) => setSelectedApp(e.target.value)}>
+          <option value="">Selecione um app...</option>
+          {todayApps
+            .filter((a) => !(a.app_name in limits))
+            .map((a) => (
+              <option key={a.app_name} value={a.app_name}>
+                {a.app_name}
+              </option>
+            ))}
+        </select>
+        <input
+          type="number"
+          min={1}
+          placeholder="minutos por dia"
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+        />
+        <button onClick={handleSave}>Adicionar limite</button>
+      </div>
+
+      {limitEntries.length === 0 ? (
+        <p className="muted">Nenhum limite configurado ainda.</p>
+      ) : (
+        <div className="app-list">
+          {limitEntries.map(([appName, limitSeconds]) => {
+            const used = usageByApp.get(appName) ?? 0
+            const pct = Math.min((used / limitSeconds) * 100, 100)
+            const exceeded = used >= limitSeconds
+            return (
+              <div className="app-row" key={appName}>
+                <div className="app-row-header">
+                  <span className="app-name">{appName}</span>
+                  <span className="app-time">
+                    {formatDuration(used)} / {formatDuration(limitSeconds)}
+                  </span>
+                  <button className="link-btn" onClick={() => handleDelete(appName)}>
+                    remover
+                  </button>
+                </div>
+                <div className="bar-track">
+                  <div
+                    className="bar-fill"
+                    style={{ width: `${Math.max(pct, 2)}%`, background: exceeded ? '#f43f5e' : '#6366f1' }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function App() {
-  const [tab, setTab] = useState<'today' | 'history'>('today')
+  const [tab, setTab] = useState<'today' | 'history' | 'limits'>('today')
 
   return (
     <div className="app-shell">
@@ -123,9 +217,16 @@ export default function App() {
           <button className={tab === 'history' ? 'active' : ''} onClick={() => setTab('history')}>
             Últimos 7 dias
           </button>
+          <button className={tab === 'limits' ? 'active' : ''} onClick={() => setTab('limits')}>
+            Limites
+          </button>
         </nav>
       </header>
-      <main className="app-main">{tab === 'today' ? <TodayView /> : <HistoryView />}</main>
+      <main className="app-main">
+        {tab === 'today' && <TodayView />}
+        {tab === 'history' && <HistoryView />}
+        {tab === 'limits' && <LimitsView />}
+      </main>
     </div>
   )
 }

@@ -1,7 +1,15 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, powerMonitor, nativeImage } from 'electron'
+import { app, BrowserWindow, Tray, Menu, ipcMain, powerMonitor, nativeImage, Notification } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { addUsage, getUsageForDay, getUsageSince, getTotalForDay } from './db.js'
+import {
+  addUsage,
+  getUsageForDay,
+  getUsageSince,
+  getTotalForDay,
+  getLimits,
+  setLimit,
+  deleteLimit,
+} from './db.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -20,6 +28,26 @@ function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+// tracks which (day, appName) pairs already triggered a limit notification
+const notifiedLimits = new Set<string>()
+
+function checkLimit(day: string, appName: string) {
+  const limitSeconds = getLimits()[appName]
+  if (!limitSeconds) return
+
+  const total = getUsageForDay(day).find((u) => u.app_name === appName)?.seconds ?? 0
+  if (total < limitSeconds) return
+
+  const key = `${day}::${appName}`
+  if (notifiedLimits.has(key)) return
+  notifiedLimits.add(key)
+
+  new Notification({
+    title: 'Limite de tempo atingido',
+    body: `Você já passou do limite diário em ${appName}.`,
+  }).show()
+}
+
 async function pollActiveWindow() {
   try {
     const idleSeconds = powerMonitor.getSystemIdleTime()
@@ -30,7 +58,9 @@ async function pollActiveWindow() {
     if (!result) return
 
     const appName = result.owner?.name ?? 'Unknown'
-    addUsage(todayKey(), appName, POLL_INTERVAL_MS / 1000)
+    const day = todayKey()
+    addUsage(day, appName, POLL_INTERVAL_MS / 1000)
+    checkLimit(day, appName)
   } catch (err) {
     console.error('[tracker] poll failed:', err)
   }
@@ -111,6 +141,16 @@ ipcMain.handle('usage:range', (_e, days: number) => {
   since.setDate(since.getDate() - (days - 1))
   const sinceKey = since.toISOString().slice(0, 10)
   return getUsageSince(sinceKey)
+})
+
+ipcMain.handle('limits:get', () => getLimits())
+
+ipcMain.handle('limits:set', (_e, appName: string, limitSeconds: number) => {
+  setLimit(appName, limitSeconds)
+})
+
+ipcMain.handle('limits:delete', (_e, appName: string) => {
+  deleteLimit(appName)
 })
 
 app.whenReady().then(() => {

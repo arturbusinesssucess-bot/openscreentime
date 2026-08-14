@@ -142,3 +142,46 @@ body {
 .history-bar-segment {
   height: 100%;
 }
+
+.limit-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.limit-form select,
+.limit-form input {
+  background: #1a1d27;
+  border: 1px solid #2a2e39;
+  color: #e6e8ec;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.limit-form input {
+  width: 140px;
+}
+
+.limit-form button {
+  background: #6366f1;
+  border: none;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #6b7080;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-btn:hover {
+  color: #f43f5e;
+}

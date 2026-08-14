@@ -69,3 +69,36 @@ export function getTotalForDay(day: string): number {
   const dayData = store[day] ?? {}
   return Object.values(dayData).reduce((sum, s) => sum + s, 0)
 }
+
+// Limits: { [appName]: limitSeconds }
+type LimitsStore = Record<string, number>
+
+const limitsPath = path.join(userDataDir, 'limits.json')
+
+function loadLimits(): LimitsStore {
+  try {
+    return JSON.parse(fs.readFileSync(limitsPath, 'utf-8'))
+  } catch {
+    return {}
+  }
+}
+
+let limits: LimitsStore = loadLimits()
+
+function persistLimits() {
+  fs.writeFileSync(limitsPath, JSON.stringify(limits), 'utf-8')
+}
+
+export function getLimits(): LimitsStore {
+  return limits
+}
+
+export function setLimit(appName: string, limitSeconds: number) {
+  limits[appName] = limitSeconds
+  persistLimits()
+}
+
+export function deleteLimit(appName: string) {
+  delete limits[appName]
+  persistLimits()
+}
