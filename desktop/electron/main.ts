@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Tray, Menu, ipcMain, powerMonitor, nativeImage, Notification } from 'electron'
+import { app, BrowserWindow, Tray, Menu, ipcMain, powerMonitor, nativeImage, Notification, dialog } from 'electron'
 import path from 'node:path'
+import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   addUsage,
@@ -107,7 +108,7 @@ function createWindow() {
     title: 'OpenScreenTime',
     icon: ICON_PATH,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -178,6 +179,31 @@ ipcMain.handle('categories:get', () => getCategories())
 
 ipcMain.handle('categories:set', (_e, appName: string, category: string) => {
   setCategory(appName, category)
+})
+
+ipcMain.handle('export:data', async (_e, format: 'csv' | 'json') => {
+  if (!win) return null
+
+  const rows = getUsageSince('1970-01-01')
+  const { canceled, filePath } = await dialog.showSaveDialog(win, {
+    title: 'Exportar dados',
+    defaultPath: `openscreentime-export.${format}`,
+    filters:
+      format === 'csv'
+        ? [{ name: 'CSV', extensions: ['csv'] }]
+        : [{ name: 'JSON', extensions: ['json'] }],
+  })
+  if (canceled || !filePath) return null
+
+  if (format === 'json') {
+    fs.writeFileSync(filePath, JSON.stringify(rows, null, 2), 'utf-8')
+  } else {
+    const header = 'day,app_name,seconds'
+    const lines = rows.map((r) => `${r.day},"${r.app_name.replace(/"/g, '""')}",${r.seconds}`)
+    fs.writeFileSync(filePath, [header, ...lines].join('\n'), 'utf-8')
+  }
+
+  return filePath
 })
 
 app.whenReady().then(() => {

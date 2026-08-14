@@ -27,6 +27,8 @@ const api = {
   getCategories: (): Promise<Record<string, string>> => ipcRenderer.invoke('categories:get'),
   setCategory: (appName: string, category: string): Promise<void> =>
     ipcRenderer.invoke('categories:set', appName, category),
+  exportData: (format: 'csv' | 'json'): Promise<string | null> =>
+    ipcRenderer.invoke('export:data', format),
 }
 
 contextBridge.exposeInMainWorld('openScreenTime', api)

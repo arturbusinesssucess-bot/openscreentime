@@ -186,6 +186,29 @@ body {
   color: #f43f5e;
 }
 
+.export-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.export-btn {
+  border: 1px solid #2a2e39;
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: #dfe2e8;
+}
+
+.export-btn:hover {
+  color: #6366f1;
+  border-color: #6366f1;
+}
+
+.export-status {
+  font-size: 12px;
+}
+
 .category-select {
   background: #1a1d27;
   border: 1px solid #2a2e39;

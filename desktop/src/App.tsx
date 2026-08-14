@@ -146,6 +146,28 @@ function TodayView() {
   )
 }
 
+function ExportButtons() {
+  const [status, setStatus] = useState('')
+
+  const handleExport = async (format: 'csv' | 'json') => {
+    setStatus('Exportando...')
+    const filePath = await window.openScreenTime.exportData(format)
+    setStatus(filePath ? `Salvo em ${filePath}` : '')
+  }
+
+  return (
+    <div className="export-row">
+      <button className="link-btn export-btn" onClick={() => handleExport('csv')}>
+        Exportar CSV
+      </button>
+      <button className="link-btn export-btn" onClick={() => handleExport('json')}>
+        Exportar JSON
+      </button>
+      {status && <span className="muted export-status">{status}</span>}
+    </div>
+  )
+}
+
 function HistoryView() {
   const [rows, setRows] = useState<DayAppUsage[]>([])
 
@@ -167,8 +189,10 @@ function HistoryView() {
   if (rows.length === 0) return <p className="muted">Sem dados dos últimos 7 dias ainda.</p>
 
   return (
-    <div className="history-list">
-      {byDay.map(([day, entry]) => (
+    <div>
+      <ExportButtons />
+      <div className="history-list">
+        {byDay.map(([day, entry]) => (
         <div key={day} className="history-day">
           <div className="history-day-header">
             <span>{new Date(day + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}</span>
@@ -191,7 +215,8 @@ function HistoryView() {
               ))}
           </div>
         </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
