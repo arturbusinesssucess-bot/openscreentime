@@ -22,12 +22,24 @@ const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
 const POLL_INTERVAL_MS = 2000
 const IDLE_THRESHOLD_SECONDS = 60
 
+const ICON_PATH = VITE_DEV_SERVER_URL
+  ? path.join(process.env.APP_ROOT, 'public', 'icon.png')
+  : path.join(RENDERER_DIST, 'icon.png')
+
 let win: BrowserWindow | null = null
 let tray: Tray | null = null
 let pollTimer: NodeJS.Timeout | null = null
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  if (h === 0 && m === 0) return '<1m'
+  if (h === 0) return `${m}m`
+  return `${h}h ${m}m`
 }
 
 // tracks which (day, appName) pairs already triggered a limit notification
@@ -63,9 +75,15 @@ async function pollActiveWindow() {
     const day = todayKey()
     addUsage(day, appName, POLL_INTERVAL_MS / 1000)
     checkLimit(day, appName)
+    updateTrayTooltip(day)
   } catch (err) {
     console.error('[tracker] poll failed:', err)
   }
+}
+
+function updateTrayTooltip(day: string) {
+  if (!tray) return
+  tray.setToolTip(`OpenScreenTime — hoje: ${formatDuration(getTotalForDay(day))}`)
 }
 
 function startTracking() {
@@ -87,6 +105,7 @@ function createWindow() {
     minWidth: 700,
     minHeight: 500,
     title: 'OpenScreenTime',
+    icon: ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -110,8 +129,8 @@ function createWindow() {
 }
 
 function createTray() {
-  const icon = nativeImage.createEmpty()
-  tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon)
+  const icon = nativeImage.createFromPath(ICON_PATH).resize({ width: 16, height: 16 })
+  tray = new Tray(icon)
   tray.setToolTip('OpenScreenTime')
   const menu = Menu.buildFromTemplate([
     {
@@ -164,6 +183,7 @@ ipcMain.handle('categories:set', (_e, appName: string, category: string) => {
 app.whenReady().then(() => {
   createWindow()
   createTray()
+  updateTrayTooltip(todayKey())
   startTracking()
 
   app.on('activate', () => {

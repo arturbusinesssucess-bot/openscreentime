@@ -6,6 +6,7 @@
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
+    "icon": "node scripts/generate-icon.mjs",
     "dev": "vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
